@@ -63,6 +63,8 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — Live outage test passed (UT99 stopped via NFO): GAME_DOWN 16:09:02, emergency sent 16:10:02,
+  UP 16:11:32, receipt cancelled + recovery sent 16:12:32 ("was down 2m").
 - 2026-11-23 — History scrubbed of PC/account names and autologon details (all hashes changed); published as
   public repo `vtak007/UT99-Server-Down-Monitor`; `feature/initial-monitor` merged as `main` and deleted.
 - 2026-11-23 — Live: monitor running as a scheduled task (admin account, Interactive); startup push received on the phone;

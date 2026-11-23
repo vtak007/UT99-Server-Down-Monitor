@@ -4,9 +4,9 @@
 
 | #    | Item                                          | Status                                                |
 | ---- | --------------------------------------------- | ----------------------------------------------------- |
-| 1    | Real outage test (alert → ack → recovery)     | Ready — waiting on you; best after #3                 |
+| 1    | Both-phones check after the group is set up   | Blocked — waiting on #3                               |
 | 2    | First 09:00 digest                            | Open — due 2026-11-24 09:00                           |
-| 3    | Second admin via Pushover Delivery Group      | Open — waiting on his User Key and your group setup   |
+| 3    | Second admin via Pushover Delivery Group      | Blocked — waiting on the other admin's Pushover setup |
 | 4    | Digest priority while an outage is unobserved | Accepted — normal priority (your decision 2026-11-23) |
 | 5    | Cause of the server's unexplained outages     | Open — needs monitor data                             |
 | 6    | `RESTART_DETECTED` from GameSpy `queryid`     | Blocked — needs poll-log data on `queryid` resets     |
@@ -14,9 +14,6 @@
 
 ## VERIFY
 
-1. Stop UT99 from the NFO panel for about 3 min. Expect `UT99 CRASHED (VPS up)` about 90 s after the stop,
-   repeating until acknowledged, then `Server UP — was down Xm` after the restart, and `GAME_DOWN` then `UP` in
-   the CSV. With a delivery group set up, check both phones, and check that one acknowledgement stops both.
 2. Tomorrow at 09:00: the digest arrives ("UT99 overnight: all quiet" unless something happened).
 
 ## WATCH
@@ -29,7 +26,10 @@ None.
 
 ## BLOCKED
 
-3. Second admin: he installs Pushover and sends you his User Key. You create a Delivery Group with both keys,
+1. Once the group is live (#3), repeat the outage test: both phones get `UT99 CRASHED (VPS up)`, and one
+   acknowledgement stops the alert on both. (The single-phone test passed 2026-11-23: alert 60 s after the first
+   failed check, recovery 60 s after the first good one.)
+3. Second admin: waiting for him to confirm he has the Pushover app and an account, and to send you his User Key. You create a Delivery Group with both keys,
    re-run `.\Setup.ps1` with the group key as the User Key, then restart the monitor.
 5. Root cause of the recent unexplained outages — unknown until the monitor has gathered evidence.
 6. `RESTART_DETECTED` row: `qid` counts every query from anyone and reset at least once on 2026-11-23. Once the
