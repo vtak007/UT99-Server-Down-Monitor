@@ -46,6 +46,7 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — 09:00 digest committed: built from CSV, persisted sent-state, 3 h grace, priority 2 if still down.
 - 2026-11-23 — Interval/outage maths and Get-DowntimeReport.ps1 committed (BLIPs listed, Method paragraph, exclusions stated).
 - 2026-11-23 — Quiet-hours window logic committed (crosses midnight; per-bound local conversion for DST).
 - 2026-11-23 — Evidence files committed: append-only CSV with lock retry, raw poll log (with qid), MONITOR_GAP inference, 12-month pruning.
