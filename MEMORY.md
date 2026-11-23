@@ -46,6 +46,7 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — Evidence files committed: append-only CSV with lock retry, raw poll log (with qid), MONITOR_GAP inference, 12-month pruning.
 - 2026-11-23 — State machine committed: 3-cycle debounce, UNKNOWN blind intervals, class changes, BLIP events.
 - 2026-11-23 — Ping probe and per-cycle classification (UP/GAME_DOWN/HOST_DOWN/LINK_DOWN) committed.
 - 2026-11-23 — GameSpy `\status\` probe with out-of-order multi-packet reassembly committed.
