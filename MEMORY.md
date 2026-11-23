@@ -10,7 +10,9 @@ Persistent project memory. Read at the start of every session.
 ## RULED-OUT THEORIES
 
 - *(none yet about the outages.)*
-- Implementation: Task Scheduler restart-on-failure does NOT relaunch on a non-zero exit code (reported; to be confirmed live) — hence the 5-minute repeating trigger.
+- Implementation: Task Scheduler's restart-on-failure is not relied on — it is widely reported not to relaunch on a
+  non-zero exit code (not tested here). The 5-minute repeating trigger (`IgnoreNew`) is the relaunch mechanism;
+  verified live 2026-11-23: task stopped 15:26:59, relaunched by the trigger 15:30:01.
 
 ## PROJECT CONVENTIONS
 
@@ -22,8 +24,9 @@ Persistent project memory. Read at the start of every session.
 - **Multi-packet responses:** with players connected, a `\status\` reply spans several UDP
   datagrams and only the last carries `\final\`. Any reader must accumulate until `\final\`
   or timeout, else it reports false failures under load.
-- **`queryid` counter (2026-11-23):** rises by 1 per query (29→30→31 at ~14:00) and had
-  reset to 15 by ~14:30 on map DM-Codex. Reset cause (map change vs restart) not yet known.
+- **`queryid` counter (2026-11-23):** counts every query from anyone (master servers, browsers),
+  not just ours — 57→68→72 between our 30 s polls. Our consecutive queries gave 29→30→31 at ~14:00;
+  it had reset to 15 by ~14:30 on map DM-Codex. Reset cause (map change vs restart) not yet known.
 - **Secrets:** Pushover user key and app token live in `config.ini`, untracked. The global
   `core.excludesFile` (`~/.gitignore_global`) excludes `*.ini` — verified in
   effect 2026-11-08. The key-free template is `config.template` (not `config.example.ini`: the
@@ -43,10 +46,21 @@ Persistent project memory. Read at the start of every session.
 - **Pre-commit:** verify the doc-update gate in the global `CLAUDE.md` (Readme/CLAUDE.md
   updates come only after the user has tested and approved, as the last step before merge)
   and update this file with new findings.
-- Repo is private; work on feature branches, never directly on `main`.
+- Repo is private; work on feature branches, never directly on `main`. No remote exists yet.
+- **The scheduled task runs straight from the working tree**, so a branch switch or an edit changes the live
+  monitor at its next start. Commit, then restart deliberately.
+- **A running monitor never reloads `config.ini`.** Found 2026-11-23: Setup was run twice (15:09, 15:15); the
+  5-minute trigger had already started the monitor at 15:10 with the first run's keys, so its "monitor started"
+  push went to a destination that wasn't the admin's phone. Fixed by restarting the task. After any Setup run or
+  config edit, restart the task.
+- **Second admin (decided 2026-11-23, reversing the design's sole-recipient non-goal):** via a Pushover
+  Delivery Group — the group key replaces the User Key in `config.ini`; no code change. Any member's
+  acknowledgement stops an emergency for everyone; quiet hours are shared.
 
 ## CHANGE LOG
 
+- 2026-11-23 — Live: monitor running as a scheduled task (admin account, Interactive); startup push received on the phone;
+  kill/relaunch and MONITOR_GAP inference verified. Docs written: `Readme.md`, `CLAUDE.md`, `Workspace Map.md`.
 - 2026-11-23 — Final-review fixes committed (blind-window escalation, CSV tail repair, cancel retry, receipt persistence, row queue, 5-min watchdog trigger).
 - 2026-11-23 — Setup.ps1 committed (hidden key prompts → config.ini, test push, logon task as current user).
 - 2026-11-23 — UT99-Monitor.ps1 main loop committed (mutex, drift-free cadence, cycle error isolation, MONITOR_STOPPED on exit).

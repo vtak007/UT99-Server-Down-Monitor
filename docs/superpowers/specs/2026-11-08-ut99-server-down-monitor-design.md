@@ -1,8 +1,8 @@
 # UT99 Server Down Monitor — Design
 
 **Date:** 2026-11-08
-**Status:** Awaiting admin approval. Builder review complete; its questions are resolved in
-§9 (admin's answers) and §10 (assistant's calls).
+**Status:** Approved 2026-11-08. Implemented 2026-11-23 per
+`docs/superpowers/plans/2026-11-23-ut99-server-down-monitor.md`; see §11 for amendments made since.
 **Branch:** `feature/initial-monitor`
 
 ---
@@ -45,7 +45,7 @@ the admin can pull one forward deliberately:
 - Automatically restarting UT99.
 - A status page, badge, or widget on the live-scores site.
 - Player-count history or graphing (though player count *is* captured at state changes).
-- Notifying other administrators (explicitly decided: the admin is the sole recipient).
+- ~~Notifying other administrators~~ — reversed 2026-11-23, see §11.
 - SMS or email fallback.
 - Monitoring anything other than this one server.
 
@@ -415,3 +415,18 @@ above:
 
 Six of these answer questions raised by the builder review; the remaining three went back
 to the admin and are recorded in §9.
+
+## 11. Amendments after approval
+
+Decided during implementation and live testing (2026-11-23). Each overrides the section it names.
+
+| § | Amendment |
+|---|---|
+| 3 | **A second administrator will receive notifications.** Done through a Pushover Delivery Group: the group key replaces the User Key in `config.ini`, with no code change. Any member's acknowledgement stops an emergency alert for everyone, and quiet hours are shared. |
+| 6.4 | **`BLIP` event rows.** One or two failing cycles followed by a success are recorded in the CSV, so restarts shorter than the debounce are visible. They are not downtime and send no alert. |
+| 6.7 | **The poll log records the server's GameSpy `queryid` counter** (`qid=`), as groundwork for detecting very fast restarts. |
+| 6.7 | **The tracked template is `config.template`,** not `config.example.ini`, because the secrets hook blocks the assistant from writing `.ini` files. |
+| 6.8 | **Outages are merged only across `UNKNOWN` (home internet down).** A `MONITOR_*` gap ends the outage, which is flagged as interrupted, so a multi-day gap never joins two unrelated outages. |
+| 6.9 | **The scheduled task also triggers every 5 minutes** (`IgnoreNew`) as a relaunch watchdog, because restart-on-failure is not relied on for a non-zero exit. |
+| 6.10 | **The "monitor started" notification is suppressed during quiet hours.** The 09:00 digest reports the coverage. |
+
