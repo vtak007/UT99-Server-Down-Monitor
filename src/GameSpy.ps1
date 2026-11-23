@@ -6,41 +6,58 @@ function ConvertFrom-GameSpyPackets {
     [CmdletBinding()]
     param([AllowEmptyCollection()][string[]]$Packets = @())
 
-    $data = @{}
-    $fragments = @{}
-    $finalFragment = $null
-    $queryNumber = $null
+    # Reassembly state is kept per query number so fragments of different queries never mix.
+    $groups = [ordered]@{}
 
     foreach ($packet in $Packets) {
         $parts = $packet.Split('\')
         # parts[0] is the empty string before the leading backslash.
-        $fragment = $null
+        $pairs = @{}
+        $queryNumber = ''
+        $fragment = 1
         $isFinal = $false
+        $valid = $true
         for ($i = 1; $i -lt $parts.Length; $i += 2) {
             $key = $parts[$i]
             if ($key -eq '') { continue }
             if ($key -eq 'final') { $isFinal = $true; continue }
             $value = if ($i + 1 -lt $parts.Length) { $parts[$i + 1] } else { '' }
             if ($key -eq 'queryid') {
-                $qp = $value.Split('.')
-                $queryNumber = $qp[0]
-                $fragment = if ($qp.Length -gt 1) { [int]$qp[1] } else { 1 }
+                if ($value -notmatch '^(\d{1,9})(?:\.(\d{1,3}))?$') { $valid = $false; break }
+                $queryNumber = $Matches[1]
+                $fragment = if ($Matches[2]) { [int]$Matches[2] } else { 1 }
+                if ($fragment -lt 1 -or $fragment -gt $script:MaxGameSpyFragments) { $valid = $false; break }
                 continue
             }
-            $data[$key] = $value
+            $pairs[$key] = $value
         }
-        if ($null -eq $fragment) { $fragment = 1 }
-        $fragments[$fragment] = $true
-        if ($isFinal) { $finalFragment = $fragment }
+        if (-not $valid) { continue }
+
+        if (-not $groups.Contains($queryNumber)) {
+            $groups[$queryNumber] = @{ Data = @{}; Fragments = @{}; Final = $null }
+        }
+        $g = $groups[$queryNumber]
+        foreach ($k in $pairs.Keys) { $g.Data[$k] = $pairs[$k] }
+        $g.Fragments[$fragment] = $true
+        if ($isFinal) { $g.Final = $fragment }
     }
 
-    if ($null -eq $finalFragment) { return $null }
-    for ($n = 1; $n -le $finalFragment; $n++) {
-        if (-not $fragments.ContainsKey($n)) { return $null }
+    foreach ($queryNumber in $groups.Keys) {
+        $g = $groups[$queryNumber]
+        if ($null -eq $g.Final) { continue }
+        $complete = $true
+        for ($n = 1; $n -le $g.Final; $n++) {
+            if (-not $g.Fragments.ContainsKey($n)) { $complete = $false; break }
+        }
+        if (-not $complete) { continue }
+        if ($queryNumber -ne '') { $g.Data['_queryid'] = $queryNumber }
+        return $g.Data
     }
-    if ($null -ne $queryNumber) { $data['_queryid'] = $queryNumber }
-    $data
+    $null
 }
+
+# Upper bound on fragments per reply; a real UT99 \status\ reply is a handful of packets.
+$script:MaxGameSpyFragments = 64
 
 function Invoke-GameSpyStatus {
     # Sends \status\ and accumulates replies until complete or TimeoutMs elapses. Never throws.

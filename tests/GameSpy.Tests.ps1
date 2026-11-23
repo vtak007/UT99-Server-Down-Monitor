@@ -58,6 +58,30 @@ Describe 'ConvertFrom-GameSpyPackets' {
     It 'returns null when a middle fragment is missing' {
         ConvertFrom-GameSpyPackets -Packets @($Frag1, $Frag3) | Should -BeNullOrEmpty
     }
+
+    It 'ignores an absurd fragment number quickly' {
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        ConvertFrom-GameSpyPackets -Packets @('\a\b\queryid\5.2147483647\final\') | Should -BeNullOrEmpty
+        $sw.ElapsedMilliseconds | Should -BeLessThan 500
+    }
+
+    It 'ignores a non-numeric fragment number without throwing' {
+        { ConvertFrom-GameSpyPackets -Packets @('\a\b\queryid\5.x\final\') } | Should -Not -Throw
+        ConvertFrom-GameSpyPackets -Packets @('\a\b\queryid\5.x\final\') | Should -BeNullOrEmpty
+    }
+
+    It 'does not mix fragments from different query ids' {
+        $q93a = '\maxplayers\16\queryid\93.2'
+        $q93b = '\player_1\Alice\queryid\93.3\final\'
+        ConvertFrom-GameSpyPackets -Packets @($Frag1, $q93a, $q93b) | Should -BeNullOrEmpty
+    }
+
+    It 'completes one query id even with a stray packet from another' {
+        $stray = '\hostname\EVIL\mapname\DM-Fake\queryid\93.1'
+        $r = ConvertFrom-GameSpyPackets -Packets @($stray, $Frag1, $Frag2, $Frag3)
+        $r.mapname | Should -Be 'DM-Deck16]['
+        $r.hostname | Should -Be 'FMJ'
+    }
 }
 
 Describe 'Invoke-GameSpyStatus' {
