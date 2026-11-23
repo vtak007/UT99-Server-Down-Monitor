@@ -40,6 +40,8 @@ Persistent project memory. Read at the start of every session.
   written by SYSTEM to the Dropbox folder may never replicate off the PC, silently voiding
   the off-site backup of the evidence. A logon trigger is safe here because autologon is
   enabled (verified 2026-11-08), so the PC signs itself in unattended after a reboot.
+- **Digest priority when blind (user decision 2026-11-23):** if the home link is down at 09:00 during an
+  outage, the digest stays at normal priority — the server is unobserved, not observed-down.
 - **Unobservable time is never counted as uptime.** `LINK_DOWN`, `UNKNOWN` (monitor blind)
   and `MONITOR_GAP` (monitor not running) are all excluded from the uptime denominator and
   reported separately. The evidence file's value is that NFO cannot wave it away.

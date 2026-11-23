@@ -7,7 +7,7 @@
 | 1    | Real outage test (alert → ack → recovery)     | Ready — waiting on you; best after #3                 |
 | 2    | First 09:00 digest                            | Open — due 2026-11-24 09:00                           |
 | 3    | Second admin via Pushover Delivery Group      | Open — waiting on his User Key and your group setup   |
-| 4    | Digest priority while an outage is unobserved | Waiting on your approval                              |
+| 4    | Digest priority while an outage is unobserved | Accepted — normal priority (your decision 2026-11-23) |
 | 5    | Cause of the server's unexplained outages     | Open — needs monitor data                             |
 | 6    | `RESTART_DETECTED` from GameSpy `queryid`     | Blocked — needs poll-log data on `queryid` resets     |
 | 7–12 | Deferred minor review findings                | Accepted for now                                      |
@@ -25,8 +25,7 @@ None.
 
 ## DECIDE
 
-4. If your home internet is down at 09:00 while an outage was in progress, the digest goes at normal priority
-   (the server is unobserved, not observed-down). Keep that, or send it at emergency priority?
+None.
 
 ## BLOCKED
 
@@ -39,6 +38,8 @@ None.
 
 ## ACCEPTED
 
+4. If the home internet is down at 09:00 while an outage was in progress, the digest goes at normal priority:
+   the server is unobserved, not observed-down.
 7. An outage followed by a home-internet gap at the end of a report period shows its end as the gap start.
 8. The digest can read "Now: MONITOR_STARTED" just after a restart.
 9. A locked poll log at startup makes the monitor exit; the 5-minute trigger relaunches it.
