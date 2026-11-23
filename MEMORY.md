@@ -46,6 +46,7 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — UT99-Monitor.ps1 main loop committed (mutex, drift-free cadence, cycle error isolation, MONITOR_STOPPED on exit).
 - 2026-11-23 — Notifier committed: emergency→ack→15-min reminders, expiry hand-off, cancel at quiet start, digest, pending retry.
 - 2026-11-23 — Pushover transport committed (send/receipt/cancel, retryable mapping, secrets redacted from errors).
 - 2026-11-23 — 09:00 digest committed: built from CSV, persisted sent-state, 3 h grace, priority 2 if still down.
