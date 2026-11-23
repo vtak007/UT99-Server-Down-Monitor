@@ -9,7 +9,8 @@ Persistent project memory. Read at the start of every session.
 
 ## RULED-OUT THEORIES
 
-- *(none yet)*
+- *(none yet about the outages.)*
+- Implementation: Task Scheduler restart-on-failure does NOT relaunch on a non-zero exit code (reported; to be confirmed live) — hence the 5-minute repeating trigger.
 
 ## PROJECT CONVENTIONS
 
@@ -46,6 +47,7 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — Final-review fixes committed (blind-window escalation, CSV tail repair, cancel retry, receipt persistence, row queue, 5-min watchdog trigger).
 - 2026-11-23 — Setup.ps1 committed (hidden key prompts → config.ini, test push, logon task as current user).
 - 2026-11-23 — UT99-Monitor.ps1 main loop committed (mutex, drift-free cadence, cycle error isolation, MONITOR_STOPPED on exit).
 - 2026-11-23 — Notifier committed: emergency→ack→15-min reminders, expiry hand-off, cancel at quiet start, digest, pending retry.
