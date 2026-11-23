@@ -46,6 +46,7 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — Ping probe and per-cycle classification (UP/GAME_DOWN/HOST_DOWN/LINK_DOWN) committed.
 - 2026-11-23 — GameSpy `\status\` probe with out-of-order multi-packet reassembly committed.
 - 2026-11-23 — Implementation plan written (BLIP rows + `qid` logging added); scaffolding,
   `config.template` and config loader (`Read-MonitorConfig`) committed.
