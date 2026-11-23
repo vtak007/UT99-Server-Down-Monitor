@@ -1,0 +1,42 @@
+; UT99 Server Down Monitor — configuration template (INI format, no secrets).
+; Setup.ps1 copies this to config.ini (untracked) and fills in the Pushover keys.
+; Any key left out of config.ini falls back to the default shown here.
+
+[Server]
+Address=74.91.119.21          ; server IP
+QueryPort=7778                ; GameSpy UDP query port (\status\)
+GamePort=7777                 ; game port (informational)
+
+[Probe]
+IntervalSeconds=30            ; seconds between probe cycles
+GameTimeoutMs=3000            ; wait this long for a complete \status\ reply
+PingTimeoutMs=1000            ; ICMP echo timeout per attempt
+PingCount=2                   ; ICMP attempts per target; any reply = reachable
+LinkTargets=1.1.1.1,8.8.8.8   ; public hosts proving the home internet works
+
+[Debounce]
+DownThreshold=3               ; consecutive failing cycles before declaring down
+UpThreshold=3                 ; consecutive successful cycles before declaring up
+
+[Notify]
+QuietStart=01:00              ; no notifications from this local time...
+QuietEnd=09:00                ; ...until this one; the daily digest is sent here
+EmergencyRetrySeconds=300     ; Pushover priority-2 retry (minimum 30)
+EmergencyExpireSeconds=10800  ; Pushover priority-2 expiry (maximum 10800)
+ReminderMinutes=15            ; still-down reminder interval after acknowledgement
+ReceiptPollSeconds=60         ; how often to check whether the emergency was acknowledged
+SoundDown=siren               ; Pushover sound for down alerts
+SoundUp=magic                 ; Pushover sound for recovery
+SoundInfo=pushover            ; Pushover sound for startup and digest
+DigestGraceHours=3            ; send a missed digest up to this long after QuietEnd
+
+[Pushover]
+UserKey=                      ; entered by Setup.ps1 — never commit
+AppToken=                     ; entered by Setup.ps1 — never commit
+
+[Data]
+DataDir=data                  ; relative to the config file's folder
+RawRetentionMonths=12         ; keep raw poll logs this many months
+
+[Health]
+PingUrl=                      ; optional dead-man's-switch URL (e.g. Healthchecks.io), pinged each cycle
