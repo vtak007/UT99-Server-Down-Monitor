@@ -35,7 +35,9 @@ Describe 'New-MonitorTaskDefinition' {
         $d.Principal.UserId | Should -Be 'EXAMPLEPC\admin'
         [string]$d.Principal.LogonType | Should -Be 'Interactive'
         [string]$d.Principal.RunLevel | Should -Be 'Limited'
-        $d.Trigger.UserId | Should -Be 'EXAMPLEPC\admin'
+        @($d.Trigger).Count | Should -Be 2
+        @($d.Trigger)[0].UserId | Should -Be 'EXAMPLEPC\admin'
+        @($d.Trigger)[1].Repetition.Interval | Should -Be 'PT5M'
         $d.Action.Execute | Should -Match 'pwsh(\.exe)?$'
         $d.Action.Arguments | Should -Match '-WindowStyle Hidden'
         $d.Action.Arguments | Should -Match ([regex]::Escape("-File `"$(Join-Path $Root 'UT99-Monitor.ps1')`""))

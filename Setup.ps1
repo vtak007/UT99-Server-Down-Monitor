@@ -44,7 +44,12 @@ function New-MonitorTaskDefinition {
     @{
         Action    = New-ScheduledTaskAction -Execute $pwsh -WorkingDirectory $RepoRoot `
             -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
-        Trigger   = New-ScheduledTaskTrigger -AtLogOn -User $UserId
+        # At logon, plus every 5 minutes as a watchdog: Task Scheduler's restart-on-failure does not fire on a
+        # non-zero exit, so the repeating trigger relaunches a dead monitor (IgnoreNew skips it while running).
+        Trigger   = @(
+            (New-ScheduledTaskTrigger -AtLogOn -User $UserId)
+            (New-ScheduledTaskTrigger -Once -At ([DateTime]::Today) -RepetitionInterval (New-TimeSpan -Minutes 5))
+        )
         Principal = New-ScheduledTaskPrincipal -UserId $UserId -LogonType Interactive -RunLevel Limited
         Settings  = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) `
             -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -StartWhenAvailable `

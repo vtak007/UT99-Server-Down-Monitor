@@ -73,6 +73,14 @@ Describe 'Get-Outages' {
         $o[0].Interrupted | Should -BeTrue
     }
 
+    It 'outages separated by a monitor gap stay separate' {
+        $rows = @((Row 0 'UP'), (Row 1 'GAME_DOWN'), (Row 2 'MONITOR_GAP'), (Row 50 'MONITOR_STARTED'), (Row 50.1 'GAME_DOWN'), (Row 51 'UP'))
+        $o = @(Get-Outages -Intervals (Get-StateIntervals -Rows $rows -From (Hrs 0) -To (Hrs 60)))
+        $o.Count | Should -Be 2
+        $o[0].End | Should -Be (Hrs 2)
+        $o[0].Interrupted | Should -BeTrue
+    }
+
     It 'ongoing outage has End null and runs to To' {
         $rows = @((Row 0 'UP'), (Row 4 'HOST_DOWN'))
         $o = @(Get-Outages -Intervals (Get-StateIntervals -Rows $rows -From (Hrs 0) -To (Hrs 5)))

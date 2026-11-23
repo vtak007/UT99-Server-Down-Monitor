@@ -69,9 +69,13 @@ function Get-Outages {
         } elseif ($iv.State -eq 'UP') {
             if ($null -ne $cur) { $outages.Add($cur); $cur = $null }
             $blindPending = $false
-        } else {
-            # Unobserved: the outage may or may not have continued.
+        } elseif ($iv.State -eq 'UNKNOWN') {
+            # Home internet down: the outage may or may not have continued; merge if it resumes.
             if ($null -ne $cur) { $blindPending = $true; $cur.Interrupted = $true }
+        } else {
+            # Monitor not running (MONITOR_*): close the outage; its true end was not observed.
+            if ($null -ne $cur) { $cur.Interrupted = $true; $outages.Add($cur); $cur = $null }
+            $blindPending = $false
         }
     }
     if ($null -ne $cur) { $outages.Add($cur) }

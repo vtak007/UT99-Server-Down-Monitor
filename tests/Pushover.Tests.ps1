@@ -65,6 +65,15 @@ Describe 'New-PushoverTransport' {
         ($t | Format-List * | Out-String) | Should -Not -Match $Tok
     }
 
+    It 'I5: truncates message to 1024 and title to 250 characters' {
+        Mock Invoke-RestMethod -ModuleName UT99Monitor { [pscustomobject]@{ status = 1 } }
+        $m = $Msg.Clone(); $m.Priority = 0; $m.Message = 'x' * 2000; $m.Title = 'y' * 300
+        (New-PushoverTransport -UserKey $Key -AppToken $Tok).Send($m).Ok | Should -BeTrue
+        Should -Invoke Invoke-RestMethod -ModuleName UT99Monitor -Times 1 -ParameterFilter {
+            $Body.message.Length -eq 1024 -and $Body.message.EndsWith('...') -and $Body.title.Length -eq 250
+        }
+    }
+
     It 'GetReceipt maps acknowledged=1 and expired=1' {
         Mock Invoke-RestMethod -ModuleName UT99Monitor { [pscustomobject]@{ status = 1; acknowledged = 1; expired = 1 } }
         $r = (New-PushoverTransport -UserKey $Key -AppToken $Tok).GetReceipt('rABC123')

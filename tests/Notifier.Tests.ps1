@@ -12,6 +12,7 @@ BeforeAll {
             Polls = [Collections.Generic.List[string]]::new()
             Cancels = [Collections.Generic.List[string]]::new()
             SendQueue = [Collections.Generic.Queue[object]]::new()
+            CancelQueue = [Collections.Generic.Queue[object]]::new()
             ReceiptStatus = @{ Ok = $true; Acknowledged = $false; Expired = $false; Error = $null }
             N = 0
         }
@@ -23,7 +24,11 @@ BeforeAll {
             @{ Ok = $true; Receipt = $(if ($Msg.Priority -eq 2) { "r$($this.N)" } else { $null }); Retryable = $false; Error = $null }
         }
         $t | Add-Member ScriptMethod GetReceipt { param($R) $this.Polls.Add($R); $this.ReceiptStatus }
-        $t | Add-Member ScriptMethod CancelReceipt { param($R) $this.Cancels.Add($R); @{ Ok = $true; Error = $null } }
+        $t | Add-Member ScriptMethod CancelReceipt {
+            param($R) $this.Cancels.Add($R)
+            if ($this.CancelQueue.Count) { return $this.CancelQueue.Dequeue() }
+            @{ Ok = $true; Error = $null }
+        }
         $t
     }
 
@@ -210,6 +215,65 @@ Describe 'Update-Notifier' {
         Invoke-Ticks $N $Ms (L 14 2) (L 14 4)
         $Tx.Sends.Count | Should -Be 1
         (Get-Content (Join-Path $Dir 'monitor.log') -Raw) | Should -Match 'HTTP 400'
+    }
+}
+
+Describe 'Update-Notifier review fixes' {
+    BeforeEach {
+        $script:Dir = Join-Path $TestDrive ([guid]::NewGuid())
+        New-Item -ItemType Directory $Dir | Out-Null
+        $script:Csv = Join-Path $Dir 'state-changes.csv'
+        $script:Tx = New-FakeTransport
+        $script:N = New-Notifier -Config $Config -Transport $Tx -DataDir $Dir
+        Set-DigestSent -StatePath (Join-Path $Dir 'digest-state.json') -Now (L 9 0)
+    }
+
+    It 'C1: a link blip during an outage keeps one cancellable emergency, cancelled at quiet start' {
+        $s = New-MonitorState -StartedAt (L 0 17) -DownThreshold 3 -UpThreshold 3
+        $map = @{ U = 'UP'; G = 'GAME_DOWN'; L = 'LINK_DOWN' }
+        $seq = @('U', 'U', 'U') + @('G') * 41 + @('L') + @('G') * 41
+        $t = L 0 18
+        foreach ($c in $seq) {
+            $cls = $map[$c]
+            $cycle = [pscustomobject]@{ Classification = $cls; Snapshot = $(if ($cls -eq 'UP') { @{ Map = 'DM-Codex'; NumPlayers = 1; MaxPlayers = 14 } }) }
+            $tr = @(Step-MonitorState -State $s -Cycle $cycle -Now $t)
+            Update-Notifier -Notifier $N -Transitions $tr -MonitorState $s -Now $t -CsvPath $Csv
+            $t = $t.AddSeconds(30)
+        }
+        $t | Should -BeGreaterThan (L 1 0)
+        @($Tx.Sends | Where-Object Priority -eq 2).Count | Should -Be 1
+        $Tx.Cancels | Should -Contain 'r1'
+    }
+
+    It 'I1: a failed cancel at quiet start is retried until it succeeds' {
+        $ms = @{ Current = 'GAME_DOWN'; CurrentSince = (L 0 55); OutageStart = (L 0 55) }
+        Update-Notifier -Notifier $N -Transitions @(New-Tr (L 0 55) 'GAME_DOWN' 'UP') -MonitorState $ms -Now (L 0 56) -CsvPath $Csv
+        $Tx.CancelQueue.Enqueue(@{ Ok = $false; Error = 'network' })
+        Invoke-Ticks $N $ms (L 0 59) (L 1 2)
+        @($Tx.Cancels | Where-Object { $_ -eq 'r1' }).Count | Should -Be 2
+    }
+
+    It 'I2: an emergency receipt left by a previous process is cancelled by the next one' {
+        $ms = @{ Current = 'GAME_DOWN'; CurrentSince = (L 14 0); OutageStart = (L 14 0) }
+        Update-Notifier -Notifier $N -Transitions @(New-Tr (L 14 0) 'GAME_DOWN' 'UP') -MonitorState $ms -Now (L 14 1) -CsvPath $Csv
+        $tx2 = New-FakeTransport
+        $n2 = New-Notifier -Config $Config -Transport $tx2 -DataDir $Dir
+        Update-Notifier -Notifier $n2 -Transitions @() -MonitorState @{ Current = 'MONITOR_STARTED'; CurrentSince = (L 14 5); OutageStart = $null } -Now (L 14 5) -CsvPath $Csv
+        @($tx2.Cancels) | Should -Be @('r1')
+        $tx3 = New-FakeTransport
+        $n3 = New-Notifier -Config $Config -Transport $tx3 -DataDir $Dir
+        Update-Notifier -Notifier $n3 -Transitions @() -MonitorState @{ Current = 'UP'; CurrentSince = (L 14 6); OutageStart = $null } -Now (L 14 6) -CsvPath $Csv
+        $tx3.Cancels.Count | Should -Be 0
+    }
+
+    It 'I4: the digest is not resent when its state file could not be kept' {
+        $sp = Join-Path $Dir 'digest-state.json'
+        Remove-Item $sp
+        $ms = @{ Current = 'UP'; CurrentSince = (L 8 0); OutageStart = $null }
+        Update-Notifier -Notifier $N -Transitions @() -MonitorState $ms -Now (L 9 0) -CsvPath $Csv
+        Remove-Item $sp
+        Update-Notifier -Notifier $N -Transitions @() -MonitorState $ms -Now (L 9 0 30) -CsvPath $Csv
+        @($Tx.Sends | Where-Object { $_.Title -like 'UT99 overnight*' }).Count | Should -Be 1
     }
 }
 

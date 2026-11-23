@@ -53,6 +53,18 @@ Describe 'Read-MonitorConfig' {
         { Read-MonitorConfig -Path $p } | Should -Throw '*EmergencyExpireSeconds*'
     }
 
+    It 'rejects ReminderMinutes below 1' {
+        $p = Join-Path $TestDrive 'rm.ini'
+        Set-Content $p "[Notify]`nReminderMinutes=0"
+        { Read-MonitorConfig -Path $p } | Should -Throw '*ReminderMinutes*'
+    }
+
+    It 'rejects an empty LinkTargets list' {
+        $p = Join-Path $TestDrive 'lt.ini'
+        Set-Content $p "[Probe]`nLinkTargets="
+        { Read-MonitorConfig -Path $p } | Should -Throw '*LinkTargets*'
+    }
+
     It 'missing file throws mentioning Setup.ps1' {
         { Read-MonitorConfig -Path (Join-Path $TestDrive 'nope.ini') } | Should -Throw '*Setup.ps1*'
     }

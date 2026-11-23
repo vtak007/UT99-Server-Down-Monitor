@@ -97,5 +97,9 @@ function Read-MonitorConfig {
     if ($c.EmergencyRetrySeconds -lt 30) { throw "EmergencyRetrySeconds must be >= 30 (Pushover limit); got $($c.EmergencyRetrySeconds)." }
     if ($c.EmergencyExpireSeconds -gt 10800) { throw "EmergencyExpireSeconds must be <= 10800 (Pushover limit); got $($c.EmergencyExpireSeconds)." }
     if ($c.DownThreshold -lt 1 -or $c.UpThreshold -lt 1) { throw 'DownThreshold and UpThreshold must be >= 1.' }
+    if ($c.ReminderMinutes -lt 1) { throw "ReminderMinutes must be >= 1; got $($c.ReminderMinutes)." }
+    if ($c.ReceiptPollSeconds -lt 1) { throw "ReceiptPollSeconds must be >= 1; got $($c.ReceiptPollSeconds)." }
+    if ($c.IntervalSeconds -lt 0) { throw "IntervalSeconds must be >= 0; got $($c.IntervalSeconds)." }
+    if ($c.LinkTargets.Count -lt 1) { throw 'LinkTargets must list at least one host (e.g. 1.1.1.1,8.8.8.8).' }
     $c
 }

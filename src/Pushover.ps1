@@ -20,8 +20,13 @@ function Get-PushoverFailure {
 function Invoke-PushoverSend {
     param([string]$Id, [hashtable]$Msg)
     $k = $script:PushoverSecrets[$Id]
+    # Pushover limits: title 250 chars, message 1024 chars.
+    $title = [string]$Msg.Title
+    if ($title.Length -gt 250) { $title = $title.Substring(0, 250) }
+    $text = [string]$Msg.Message
+    if ($text.Length -gt 1024) { $text = $text.Substring(0, 1021) + '...' }
     $body = @{
-        token = $k.AppToken; user = $k.UserKey; title = $Msg.Title; message = $Msg.Message
+        token = $k.AppToken; user = $k.UserKey; title = $title; message = $text
         priority = [int]$Msg.Priority
     }
     if ($Msg.Sound) { $body.sound = $Msg.Sound }

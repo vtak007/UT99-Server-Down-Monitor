@@ -35,7 +35,7 @@ function Split-CsvLine([string]$Line) {
 function Invoke-WithFileRetry([scriptblock]$Action, [int]$Attempts = 10, [int]$DelayMs = 250) {
     for ($i = 1; ; $i++) {
         try { return (& $Action) }
-        catch [IO.IOException] {
+        catch [IO.IOException], [UnauthorizedAccessException] {
             if ($i -ge $Attempts) { throw }
             Start-Sleep -Milliseconds $DelayMs
         }
@@ -51,9 +51,20 @@ function Write-MonitorLog {
     try { Invoke-WithFileRetry { [IO.File]::AppendAllText($path, $line) } } catch { Write-Warning "monitor.log write failed: $($_.Exception.Message)" }
 }
 
+function Test-EndsWithNewline([string]$Path) {
+    # True for an empty file or one whose last byte is LF. A power cut can leave a partial line
+    # or a run of NUL bytes at the tail; the next row must not be glued onto it.
+    $fs = [IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
+    try {
+        if ($fs.Length -eq 0) { return $true }
+        [void]$fs.Seek(-1, 'End')
+        $fs.ReadByte() -eq 10
+    } finally { $fs.Dispose() }
+}
+
 function Add-StateChangeRow {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$CsvPath, [Parameter(Mandatory)]$Transition)
+    param([Parameter(Mandatory)][string]$CsvPath, [Parameter(Mandatory)]$Transition, [int]$Attempts = 10, [int]$DelayMs = 250)
     $snap = $Transition.Snapshot
     $fields = @(
         (Format-LocalTimestamp $Transition.Timestamp)
@@ -70,13 +81,32 @@ function Add-StateChangeRow {
     $dir = Split-Path $CsvPath -Parent
     if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     try {
-        Invoke-WithFileRetry {
-            $text = if (Test-Path -LiteralPath $CsvPath) { $row } else { $script:CsvHeader + "`r`n" + $row }
+        Invoke-WithFileRetry -Attempts $Attempts -DelayMs $DelayMs -Action {
+            $text = if (-not (Test-Path -LiteralPath $CsvPath)) { $script:CsvHeader + "`r`n" + $row }
+            elseif (Test-EndsWithNewline $CsvPath) { $row }
+            else { "`r`n" + $row }
             [IO.File]::AppendAllText($CsvPath, $text)
         }
     } catch {
         Write-MonitorLog -DataDir $dir -Now ([DateTimeOffset]::Now) -Message ('CSV_WRITE_FAILED ' + $row.Trim())
         throw
+    }
+}
+
+function Sync-PendingStateRows {
+    # Writes queued transitions in order; stops at the first failure and leaves the rest queued
+    # for the next cycle, so a long lock delays rows but never drops them.
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyCollection()][Collections.Generic.List[object]]$Queue, [Parameter(Mandatory)][string]$CsvPath,
+        [Parameter(Mandatory)][string]$DataDir, [Parameter(Mandatory)][DateTimeOffset]$Now, [int]$Attempts = 10, [int]$DelayMs = 250)
+    while ($Queue.Count -gt 0) {
+        try {
+            Add-StateChangeRow -CsvPath $CsvPath -Transition $Queue[0] -Attempts $Attempts -DelayMs $DelayMs
+            $Queue.RemoveAt(0)
+        } catch {
+            Write-MonitorLog -DataDir $DataDir -Now $Now -Message "CSV_WRITE_DEFERRED $($Queue.Count) row(s) queued: $($_.Exception.Message)"
+            return
+        }
     }
 }
 

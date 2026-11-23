@@ -13,8 +13,42 @@ function New-Notifier {
         DataDir         = $DataDir
         DigestStatePath = (Join-Path $DataDir 'digest-state.json')
         Esc             = $null        # escalation of the current outage
-        Pending         = @{}          # kind -> @{ Msg; CreatedAt; Emergency }
+        Pending         = @{}          # kind -> @{ Msg; CreatedAt }
         WasQuiet        = $false
+        CancelRetry     = (Get-OrphanReceipts -Path (Join-Path $DataDir 'open-receipts.json'))   # receipts still to cancel
+        ReceiptsPath    = (Join-Path $DataDir 'open-receipts.json')
+        ReceiptsJson    = $null
+        DigestSentDate  = $null        # in-memory guard against a second digest the same day
+    }
+}
+
+function Get-OrphanReceipts([string]$Path) {
+    # Emergency receipts a previous process left outstanding; this process cancels them.
+    $list = [Collections.Generic.List[object]]::new()
+    if (Test-Path -LiteralPath $Path) {
+        try {
+            foreach ($r in @((Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -ErrorAction Stop))) {
+                if ($r.receipt) { $list.Add(@{ Receipt = [string]$r.receipt; ExpiresAt = [DateTimeOffset]::Parse([string]$r.expiresAt) }) }
+            }
+        } catch { }
+    }
+    , $list
+}
+
+function Save-OpenReceipts($N, [DateTimeOffset]$Now) {
+    # Persists every emergency receipt that may still be alerting, so a restart can cancel it.
+    $open = @()
+    if ($N.Esc -and $N.Esc.Receipt -and -not $N.Esc.Acked -and -not $N.Esc.HandedOff) {
+        $open += @{ receipt = $N.Esc.Receipt; expiresAt = $N.Esc.SentAt.AddSeconds($N.Config.EmergencyExpireSeconds).ToString('o') }
+    }
+    foreach ($c in $N.CancelRetry) { $open += @{ receipt = $c.Receipt; expiresAt = $c.ExpiresAt.ToString('o') } }
+    $json = ConvertTo-Json -InputObject @($open) -Compress
+    if ($json -eq $N.ReceiptsJson) { return }
+    try {
+        Invoke-WithFileRetry -Action { [IO.File]::WriteAllText($N.ReceiptsPath, $json) }
+        $N.ReceiptsJson = $json
+    } catch {
+        Write-MonitorLog -DataDir $N.DataDir -Now $Now -Message "open-receipts.json write failed: $($_.Exception.Message)"
     }
 }
 
@@ -56,9 +90,24 @@ function Stop-Escalation($N, [DateTimeOffset]$Now) {
     # Cancels an outstanding (unacknowledged, not yet expired) emergency receipt and clears escalation.
     if ($N.Esc -and $N.Esc.Receipt -and -not $N.Esc.Acked -and -not $N.Esc.HandedOff) {
         $c = $N.Transport.CancelReceipt($N.Esc.Receipt)
-        Write-MonitorLog -DataDir $N.DataDir -Now $Now -Message "CANCEL receipt $(if ($c.Ok) { 'ok' } else { "failed: $($c.Error)" })"
+        Write-MonitorLog -DataDir $N.DataDir -Now $Now -Message "CANCEL receipt $(if ($c.Ok) { 'ok' } else { "failed, will retry: $($c.Error)" })"
+        if (-not $c.Ok) {
+            $N.CancelRetry.Add(@{ Receipt = $N.Esc.Receipt; ExpiresAt = $N.Esc.SentAt.AddSeconds($N.Config.EmergencyExpireSeconds) })
+        }
     }
     $N.Esc = $null
+}
+
+function Invoke-CancelRetries($N, [DateTimeOffset]$Now) {
+    # Retries failed cancels every cycle, quiet hours included, until they succeed or the receipt expires.
+    foreach ($item in @($N.CancelRetry)) {
+        if ($Now -ge $item.ExpiresAt) { [void]$N.CancelRetry.Remove($item); continue }
+        $c = $N.Transport.CancelReceipt($item.Receipt)
+        if ($c.Ok) {
+            [void]$N.CancelRetry.Remove($item)
+            Write-MonitorLog -DataDir $N.DataDir -Now $Now -Message 'CANCEL receipt ok (retry)'
+        }
+    }
 }
 
 function New-DownMessage($N, $Transition, [string]$TitlePrefix = '', [int]$Priority = 2) {
@@ -86,6 +135,9 @@ function Update-Notifier {
     $c = $N.Config
     $quiet = Test-InQuietHours -Now $Now -Start $c.QuietStart -End $c.QuietEnd
     $downStates = @('GAME_DOWN', 'HOST_DOWN')
+
+    # 0. Failed or orphaned receipt cancels (also during quiet hours: they stop the phone buzzing).
+    Invoke-CancelRetries $N $Now
 
     # 1. Entering quiet hours: stop Pushover's own retries and drop anything pending; the digest takes over.
     if ($quiet -and -not $N.WasQuiet) {
@@ -130,8 +182,11 @@ function Update-Notifier {
     }
 
     # 3. Escalation: acknowledgement polling, expiry hand-off, reminders.
-    if ($N.Esc -and $MonitorState.Current -notin $downStates) { $N.Esc = $null }
-    if ($N.Esc -and -not $quiet) {
+    # A blind window inside an outage keeps the escalation (the receipt stays cancellable);
+    # anything else that is not down ends it, cancelling an outstanding receipt.
+    $blindDown = $MonitorState.Current -eq 'UNKNOWN' -and $MonitorState.PreBlindState -in $downStates
+    if ($N.Esc -and $MonitorState.Current -notin $downStates -and -not $blindDown) { Stop-Escalation $N $Now }
+    if ($N.Esc -and -not $quiet -and $MonitorState.Current -in $downStates) {
         $e = $N.Esc
         if ($e.Receipt -and -not $e.Acked -and -not $e.HandedOff) {
             if ($Now -ge $e.SentAt.AddSeconds($c.EmergencyExpireSeconds)) {
@@ -154,7 +209,8 @@ function Update-Notifier {
     }
 
     # 4. Daily digest at the end of quiet hours.
-    if (-not $quiet -and (Test-DigestDue -Now $Now -QuietEnd $c.QuietEnd -GraceHours $c.DigestGraceHours -StatePath $N.DigestStatePath)) {
+    $today = $Now.ToLocalTime().ToString('yyyy-MM-dd')
+    if (-not $quiet -and $N.DigestSentDate -ne $today -and (Test-DigestDue -Now $Now -QuietEnd $c.QuietEnd -GraceHours $c.DigestGraceHours -StatePath $N.DigestStatePath)) {
         $rows = @(Read-StateChanges -CsvPath $CsvPath -WarningAction SilentlyContinue)
         $window = Get-QuietWindow -LocalDate $Now.ToLocalTime().Date -Start $c.QuietStart -End $c.QuietEnd
         $d = New-DigestMessage -Rows $rows -Window $window -CurrentState $MonitorState.Current -CurrentSince $MonitorState.CurrentSince -Now $Now
@@ -163,7 +219,9 @@ function Update-Notifier {
         if ($d.Priority -eq 2) { Stop-Escalation $N $Now }
         $r = $N.Transport.Send($msg)
         if ($r.Ok -or -not $r.Retryable) {
-            Set-DigestSent -StatePath $N.DigestStatePath -Now $Now
+            $N.DigestSentDate = $today
+            try { Set-DigestSent -StatePath $N.DigestStatePath -Now $Now }
+            catch { Write-MonitorLog -DataDir $N.DataDir -Now $Now -Message "digest-state.json write failed: $($_.Exception.Message)" }
             Write-MonitorLog -DataDir $N.DataDir -Now $Now -Message "DIGEST $(if ($r.Ok) { 'sent' } else { "failed (not retried): $($r.Error)" }) '$($d.Title)'"
             if ($r.Ok -and $d.Priority -eq 2 -and $r.Receipt) { $N.Esc = New-EscalationState -Receipt $r.Receipt -Now $Now }
         } else {
@@ -187,6 +245,8 @@ function Update-Notifier {
             [void](Send-NotifierMessage $N $kind $p.Msg $Now -FromPending)
         }
     }
+
+    Save-OpenReceipts $N $Now
 }
 
 function Send-StartupNotice {

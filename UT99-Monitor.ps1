@@ -42,8 +42,10 @@ if (-not $haveMutex) {
 }
 
 $exitCode = 0
-$state = $null
-$stopped = $false
+# Shared with the PowerShell.Exiting handler so exactly one MONITOR_STOPPED row is written.
+$global:UT99MonitorShutdown = @{ Stopped = $false; State = $null; CsvPath = $csvPath }
+$shutdown = $global:UT99MonitorShutdown
+$pendingRows = [Collections.Generic.List[object]]::new()
 try {
     if (-not $Transport) {
         if (-not $config.PushoverUserKey -or -not $config.PushoverAppToken) {
@@ -58,6 +60,7 @@ try {
     $gap = Start-MonitorSession -CsvPath $csvPath -DataDir $dataDir -Now $now
     Write-MonitorLog -DataDir $dataDir -Now $now -Message "MONITOR_STARTED pid=$PID"
     $state = New-MonitorState -StartedAt $now -DownThreshold $config.DownThreshold -UpThreshold $config.UpThreshold
+    $shutdown.State = $state
     $notifier = New-Notifier -Config $config -Transport $Transport -DataDir $dataDir
     Send-StartupNotice -Notifier $notifier -Now $now -Gap $gap
     Remove-ExpiredPollLogs -DataDir $dataDir -Now $now -RetentionMonths $config.RawRetentionMonths
@@ -65,14 +68,12 @@ try {
 
     # Best effort on host shutdown paths that skip finally.
     $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {
-        if ($global:UT99MonitorStopAction) { & $global:UT99MonitorStopAction }
-    }
-    $global:UT99MonitorStopAction = {
-        if (-not $stopped -and $state) {
-            $script:stopped = $true
-            try { Add-MonitorStoppedRow -CsvPath $csvPath -Now ([DateTimeOffset]::Now) -CurrentState $state.Current -CurrentSince $state.CurrentSince } catch { }
+        $s = $global:UT99MonitorShutdown
+        if ($s -and -not $s.Stopped -and $s.State) {
+            $s.Stopped = $true
+            try { Add-MonitorStoppedRow -CsvPath $s.CsvPath -Now ([DateTimeOffset]::Now) -CurrentState $s.State.Current -CurrentSince $s.State.CurrentSince } catch { }
         }
-    }.GetNewClosure()
+    }
 
     $start = [DateTimeOffset]::Now
     $interval = [Math]::Max(0, $config.IntervalSeconds)
@@ -83,11 +84,23 @@ try {
         $wait = ($tick - [DateTimeOffset]::Now).TotalMilliseconds
         if ($wait -gt 0) { Start-Sleep -Milliseconds ([int]$wait) }
         $now = [DateTimeOffset]::Now
+        $transitions = @()
         try {
             $cycle = & $Probe
-            Add-PollLogLine -DataDir $dataDir -Now $now -Cycle $cycle
             $transitions = @(Step-MonitorState -State $state -Cycle $cycle -Now $now)
-            foreach ($t in $transitions) { Add-StateChangeRow -CsvPath $csvPath -Transition $t }
+            foreach ($t in $transitions) { $pendingRows.Add($t) }
+        } catch {
+            Write-MonitorLog -DataDir $dataDir -Now $now -Message "CYCLE_ERROR $($_.Exception.Message) at $($_.InvocationInfo.PositionMessage -replace '\s+', ' ')"
+            $cycle = $null
+        }
+        # Evidence first (queued rows survive a locked file), then notifications regardless.
+        Sync-PendingStateRows -Queue $pendingRows -CsvPath $csvPath -DataDir $dataDir -Now $now
+        try {
+            if ($cycle) { Add-PollLogLine -DataDir $dataDir -Now $now -Cycle $cycle }
+        } catch {
+            Write-MonitorLog -DataDir $dataDir -Now $now -Message "POLL_LOG_ERROR $($_.Exception.Message)"
+        }
+        try {
             Update-Notifier -Notifier $notifier -Transitions $transitions -MonitorState $state -Now $now -CsvPath $csvPath
             Invoke-CycleHook -Url $config.HealthcheckUrl
             if ($now.ToLocalTime().Date -ne $pruneDate) {
@@ -95,7 +108,7 @@ try {
                 $pruneDate = $now.ToLocalTime().Date
             }
         } catch {
-            Write-MonitorLog -DataDir $dataDir -Now $now -Message "CYCLE_ERROR $($_.Exception.Message) at $($_.InvocationInfo.PositionMessage -replace '\s+', ' ')"
+            Write-MonitorLog -DataDir $dataDir -Now $now -Message "NOTIFY_ERROR $($_.Exception.Message) at $($_.InvocationInfo.PositionMessage -replace '\s+', ' ')"
         }
         $cycles++
         # Next future tick; missed ticks are skipped, never burst.
@@ -110,11 +123,12 @@ try {
     Write-Error -ErrorAction Continue $_
     $exitCode = 2
 } finally {
-    if (-not $stopped -and $state) {
-        $stopped = $true
-        try { Add-MonitorStoppedRow -CsvPath $csvPath -Now ([DateTimeOffset]::Now) -CurrentState $state.Current -CurrentSince $state.CurrentSince } catch { }
+    if ($pendingRows.Count) { Sync-PendingStateRows -Queue $pendingRows -CsvPath $csvPath -DataDir $dataDir -Now ([DateTimeOffset]::Now) }
+    if (-not $shutdown.Stopped -and $shutdown.State) {
+        $shutdown.Stopped = $true
+        $st = $shutdown.State
+        try { Add-MonitorStoppedRow -CsvPath $csvPath -Now ([DateTimeOffset]::Now) -CurrentState $st.Current -CurrentSince $st.CurrentSince } catch { }
     }
-    $global:UT99MonitorStopAction = $null
     Unregister-Event -SourceIdentifier PowerShell.Exiting -ErrorAction SilentlyContinue
     if ($haveMutex) { try { $mutex.ReleaseMutex() } catch { } }
     $mutex.Dispose()

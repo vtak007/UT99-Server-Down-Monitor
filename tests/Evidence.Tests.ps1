@@ -82,6 +82,32 @@ Describe 'state-changes.csv' {
         $w.Count | Should -Be 1
     }
 
+    It 'C2: a row appended after a truncated tail is still readable' {
+        Add-StateChangeRow -CsvPath $Csv -Transition (New-T $T0 'UP')
+        [IO.File]::AppendAllText($Csv, '2026-11-23T03:1')
+        Add-StateChangeRow -CsvPath $Csv -Transition (New-T $T0.AddMinutes(5) 'GAME_DOWN')
+        (@(Read-StateChanges -CsvPath $Csv -WarningAction SilentlyContinue) | ForEach-Object NewState) -join ',' | Should -Be 'UP,GAME_DOWN'
+    }
+
+    It 'C2: a NUL-filled tail does not swallow the next row' {
+        Add-StateChangeRow -CsvPath $Csv -Transition (New-T $T0 'UP')
+        $fs = [IO.File]::Open($Csv, 'Append'); $fs.Write([byte[]]::new(64), 0, 64); $fs.Dispose()
+        Add-StateChangeRow -CsvPath $Csv -Transition (New-T $T0.AddMinutes(5) 'GAME_DOWN')
+        (@(Read-StateChanges -CsvPath $Csv -WarningAction SilentlyContinue) | ForEach-Object NewState) -join ',' | Should -Be 'UP,GAME_DOWN'
+    }
+
+    It 'I3: Sync-PendingStateRows keeps rows queued while the CSV stays locked, then writes them in order' {
+        Add-StateChangeRow -CsvPath $Csv -Transition (New-T $T0 'UP')
+        $q = [Collections.Generic.List[object]]::new()
+        $q.Add((New-T $T0.AddMinutes(1) 'GAME_DOWN')); $q.Add((New-T $T0.AddMinutes(2) 'HOST_DOWN'))
+        $fs = [IO.File]::Open($Csv, 'Open', 'ReadWrite', 'None')
+        try { Sync-PendingStateRows -Queue $q -CsvPath $Csv -DataDir $Dir -Now $T0 -Attempts 2 -DelayMs 10 } finally { $fs.Dispose() }
+        $q.Count | Should -Be 2
+        Sync-PendingStateRows -Queue $q -CsvPath $Csv -DataDir $Dir -Now $T0
+        $q.Count | Should -Be 0
+        (@(Read-StateChanges -CsvPath $Csv) | ForEach-Object NewState) -join ',' | Should -Be 'UP,GAME_DOWN,HOST_DOWN'
+    }
+
     It 'reads a missing CSV as no rows' {
         @(Read-StateChanges -CsvPath (Join-Path $Dir 'none.csv')).Count | Should -Be 0
     }
@@ -159,6 +185,13 @@ Describe 'Start-MonitorSession' {
         $rows[2].PreviousDurationSeconds | Should -Be 3600
         $g.GapStart | Should -Be $T0.AddMinutes(10)
         $g.GapSeconds | Should -Be 3600
+    }
+
+    It 'C2: infers MONITOR_GAP even when the CSV ends in a truncated line' {
+        Add-StateChangeRow -CsvPath $Csv -Transition (New-T $T0 'UP' 'MONITOR_STARTED' 5)
+        [IO.File]::AppendAllText($Csv, '2026-11-23T03:1')
+        $null = Start-MonitorSession -CsvPath $Csv -DataDir $Dir -Now $T0.AddMinutes(30)
+        (@(Read-StateChanges -CsvPath $Csv -WarningAction SilentlyContinue) | ForEach-Object NewState) -join ',' | Should -Be 'UP,MONITOR_GAP,MONITOR_STARTED'
     }
 
     It 'uses the last row time when there is no poll log' {

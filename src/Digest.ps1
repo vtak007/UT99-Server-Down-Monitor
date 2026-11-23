@@ -4,7 +4,8 @@
 function Get-DigestLastSentDate([string]$StatePath) {
     if (-not (Test-Path -LiteralPath $StatePath)) { return $null }
     try {
-        $j = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json -ErrorAction Stop
+        $raw = Invoke-WithFileRetry -Action { [IO.File]::ReadAllText($StatePath) }
+        $j = $raw | ConvertFrom-Json -ErrorAction Stop
         if ($j.PSObject.Properties['lastSentLocalDate']) { return [string]$j.lastSentLocalDate }
     } catch { }
     $null
@@ -28,7 +29,7 @@ function Set-DigestSent {
     $tmp = "$StatePath.tmp"
     @{ lastSentLocalDate = $Now.ToLocalTime().ToString('yyyy-MM-dd'); sentAt = $Now.ToString('o') } |
         ConvertTo-Json | Set-Content -LiteralPath $tmp -Encoding utf8
-    Move-Item -LiteralPath $tmp -Destination $StatePath -Force
+    Invoke-WithFileRetry -Action { Move-Item -LiteralPath $tmp -Destination $StatePath -Force -ErrorAction Stop }
 }
 
 function New-DigestMessage {
