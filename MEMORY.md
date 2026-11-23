@@ -46,6 +46,7 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — Notifier committed: emergency→ack→15-min reminders, expiry hand-off, cancel at quiet start, digest, pending retry.
 - 2026-11-23 — Pushover transport committed (send/receipt/cancel, retryable mapping, secrets redacted from errors).
 - 2026-11-23 — 09:00 digest committed: built from CSV, persisted sent-state, 3 h grace, priority 2 if still down.
 - 2026-11-23 — Interval/outage maths and Get-DowntimeReport.ps1 committed (BLIPs listed, Method paragraph, exclusions stated).
