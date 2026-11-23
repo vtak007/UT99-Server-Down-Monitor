@@ -21,6 +21,8 @@ Persistent project memory. Read at the start of every session.
 - **Multi-packet responses:** with players connected, a `\status\` reply spans several UDP
   datagrams and only the last carries `\final\`. Any reader must accumulate until `\final\`
   or timeout, else it reports false failures under load.
+- **`queryid` counter (2026-11-23):** rises by 1 per query (29→30→31 at ~14:00) and had
+  reset to 15 by ~14:30 on map DM-Codex. Reset cause (map change vs restart) not yet known.
 - **Secrets:** Pushover user key and app token live in `config.ini`, untracked. The global
   `core.excludesFile` (`~/.gitignore_global`) excludes `*.ini` — verified in
   effect 2026-11-08. The key-free template is `config.template` (not `config.example.ini`: the
@@ -44,6 +46,7 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — GameSpy `\status\` probe with out-of-order multi-packet reassembly committed.
 - 2026-11-23 — Implementation plan written (BLIP rows + `qid` logging added); scaffolding,
   `config.template` and config loader (`Read-MonitorConfig`) committed.
 - 2026-11-08 — Project created. Design document approved route chosen: PowerShell watchdog
