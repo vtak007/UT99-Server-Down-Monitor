@@ -46,7 +46,9 @@ Persistent project memory. Read at the start of every session.
 - **Pre-commit:** verify the doc-update gate in the global `CLAUDE.md` (Readme/CLAUDE.md
   updates come only after the user has tested and approved, as the last step before merge)
   and update this file with new findings.
-- Repo is private; work on feature branches, never directly on `main`. No remote exists yet.
+- **Repo is public:** `vtak007/UT99-Server-Down-Monitor` (published 2026-11-23). Before publishing, history was
+  rewritten with `git filter-repo` to remove the PC/account names and autologon registry details; keep them out
+  of every committed file. Work on feature branches, never directly on `main`.
 - **The scheduled task runs straight from the working tree**, so a branch switch or an edit changes the live
   monitor at its next start. Commit, then restart deliberately.
 - **A running monitor never reloads `config.ini`.** Found 2026-11-23: Setup was run twice (15:09, 15:15); the
@@ -59,6 +61,8 @@ Persistent project memory. Read at the start of every session.
 
 ## CHANGE LOG
 
+- 2026-11-23 — History scrubbed of PC/account names and autologon details (all hashes changed); published as
+  public repo `vtak007/UT99-Server-Down-Monitor`; `feature/initial-monitor` merged as `main` and deleted.
 - 2026-11-23 — Live: monitor running as a scheduled task (admin account, Interactive); startup push received on the phone;
   kill/relaunch and MONITOR_GAP inference verified. Docs written: `Readme.md`, `CLAUDE.md`, `Workspace Map.md`.
 - 2026-11-23 — Final-review fixes committed (blind-window escalation, CSV tail repair, cancel retry, receipt persistence, row queue, 5-min watchdog trigger).

@@ -3,7 +3,7 @@ title: UT99 Server Down Monitor — Workspace Map
 type: workspace-map
 project: UT99 Server Down Monitor
 path: D:/Dropbox/Computing1/BatchFiles_Scripts/Claude Projects/UT99/UT99 Server Down Monitor
-repo: local git only (no remote yet; intended private)
+repo: vtak007/UT99-Server-Down-Monitor (public)
 tags: [workspace-map, ut99, server-monitor, powershell, pushover]
 ---
 
@@ -112,7 +112,7 @@ restart detection (open item).
 
 ## 🌿 Git
 
-**Remote:** none yet (intended private GitHub repo). **Workflow:** feature branch → tests → commit → restart
+**Remote:** `vtak007/UT99-Server-Down-Monitor` — **public**, so never commit secrets, `data\` or machine/account names. **Workflow:** feature branch → tests → commit → restart
 the live monitor → live check → docs → merge to `main`. `data\`, `.superpowers\` and `testResults.xml` are
 git-ignored; `*.ini` is excluded globally.
 
@@ -120,11 +120,11 @@ Start reading code history from these, then use `git log`:
 
 | Commit | Change |
 |---|---|
-| `8421059` | Final-review fixes: blind-window escalation, CSV tail repair, cancel retry, receipt persistence, row queue, watchdog trigger |
-| `0a6ba2f` | Main loop `UT99-Monitor.ps1` |
-| `01131a1` | Notifier (escalation, quiet hours, digest, retry) |
-| `8c48435` | State machine |
-| `d4e82a6` | Design document and seed `MEMORY.md` |
+| `bfb78b0` | Final-review fixes: blind-window escalation, CSV tail repair, cancel retry, receipt persistence, row queue, watchdog trigger |
+| `ab8c504` | Main loop `UT99-Monitor.ps1` |
+| `bb6a3c4` | Notifier (escalation, quiet hours, digest, retry) |
+| `e2a3cc6` | State machine |
+| `08be7fb` | Design document and seed `MEMORY.md` |
 
 ---
 

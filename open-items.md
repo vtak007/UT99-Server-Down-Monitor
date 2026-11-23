@@ -11,7 +11,6 @@
 | 5    | Cause of the server's unexplained outages     | Open — needs monitor data                             |
 | 6    | `RESTART_DETECTED` from GameSpy `queryid`     | Blocked — needs poll-log data on `queryid` resets     |
 | 7–12 | Deferred minor review findings                | Accepted for now                                      |
-| 13   | Create private GitHub repo, merge, push       | Waiting on your go-ahead                              |
 
 ## VERIFY
 
@@ -49,5 +48,4 @@ None.
 
 ## Git Actions Outstanding
 
-13. Create the private GitHub repo, merge `feature/initial-monitor` to `main` (`main` doesn't exist yet), push,
-    and delete the feature branch — after your go-ahead.
+None.
