@@ -51,4 +51,4 @@ None.
 
 ## Git Actions Outstanding
 
-14. Delete the merged local branch `fix/headless-console`.
+None.
