@@ -38,8 +38,12 @@ Describe 'New-MonitorTaskDefinition' {
         @($d.Trigger).Count | Should -Be 2
         @($d.Trigger)[0].UserId | Should -Be 'EXAMPLEPC\admin'
         @($d.Trigger)[1].Repetition.Interval | Should -Be 'PT5M'
-        $d.Action.Execute | Should -Match 'pwsh(\.exe)?$'
-        $d.Action.Arguments | Should -Match '-WindowStyle Hidden'
+        # Launched via headless conhost so Windows Terminal (default terminal) can't host it in a closable window.
+        $d.Action.Execute | Should -Match '\\System32\\conhost\.exe$'
+        $d.Action.Arguments | Should -Match '^--headless "[^"]*pwsh(\.exe)?" '
+        $d.Action.Arguments | Should -Match '-NonInteractive'
+        (New-MonitorTaskDefinition -RepoRoot $Root -UserId 'EXAMPLEPC\admin' -PwshPath 'C:\X\pwsh.exe').Action.Arguments |
+            Should -Match '^--headless "C:\\X\\pwsh\.exe" '
         $d.Action.Arguments | Should -Match ([regex]::Escape("-File `"$(Join-Path $Root 'UT99-Monitor.ps1')`""))
         $d.Action.WorkingDirectory | Should -Be $Root
         $d.Settings.RestartCount | Should -Be 999

@@ -38,12 +38,17 @@ function Write-ConfigWithKeys {
 
 function New-MonitorTaskDefinition {
     # Returns the scheduled-task parts without registering anything.
-    param([Parameter(Mandatory)][string]$RepoRoot, [string]$UserId = "$env:USERDOMAIN\$env:USERNAME")
-    $pwsh = (Get-Command pwsh -ErrorAction Stop).Source
+    param([Parameter(Mandatory)][string]$RepoRoot, [string]$UserId = "$env:USERDOMAIN\$env:USERNAME",
+        [string]$PwshPath = (Get-Command pwsh -ErrorAction Stop).Source)
     $script = Join-Path $RepoRoot 'UT99-Monitor.ps1'
+    # Start pwsh under a headless conhost. A plain pwsh launch with -WindowStyle Hidden gets handed to Windows
+    # Terminal when it is the default terminal: the monitor then sits in a visible, empty window, and closing that
+    # window kills it (exit 0xC000013A). Headless conhost has no window. It always exits 0, which is fine here: the
+    # watchdog trigger, not the exit code, restarts the monitor.
+    $conhost = Join-Path $env:SystemRoot 'System32\conhost.exe'
     @{
-        Action    = New-ScheduledTaskAction -Execute $pwsh -WorkingDirectory $RepoRoot `
-            -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$script`""
+        Action    = New-ScheduledTaskAction -Execute $conhost -WorkingDirectory $RepoRoot `
+            -Argument "--headless `"$PwshPath`" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$script`""
         # At logon, plus every 5 minutes as a watchdog: Task Scheduler's restart-on-failure does not fire on a
         # non-zero exit, so the repeating trigger relaunches a dead monitor (IgnoreNew skips it while running).
         Trigger   = @(
