@@ -29,6 +29,9 @@ map, wiring, data stores) is in `Workspace Map.md`; usage is in `Readme.md`; his
   (`Stop-ScheduledTask` / `Start-ScheduledTask 'UT99 Server Down Monitor'`). Never leave the tree on an
   untested branch.
 - **A running monitor does not reload `config.ini`.** Restart it after any config change or Setup run.
+- **The task launches pwsh via `conhost.exe --headless`, never a plain `-WindowStyle Hidden` pwsh.** With Windows
+  Terminal as the default terminal, the plain launch opens a visible window, and closing it kills the monitor.
+  Side effect: Task Scheduler's Last Run Result is always 0. Diagnose exits from `data\monitor.log` and the CSV.
 - **The secrets hook blocks the assistant from writing any `.ini` file.** That's why the template is
   `config.template`. Tests create their `.ini` files at run time in Pester's `TestDrive`.
 - **Never edit `data\state-changes.csv` by hand.** It is the evidence file and is append-only.

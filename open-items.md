@@ -11,6 +11,7 @@
 | 5    | Cause of the server's unexplained outages     | Open — needs monitor data                             |
 | 6    | `RESTART_DETECTED` from GameSpy `queryid`     | Blocked — needs poll-log data on `queryid` resets     |
 | 7–12 | Deferred minor review findings                | Accepted for now                                      |
+| 13   | No spurious "monitor started" notices         | Open — watching since 2026-11-23 22:25                |
 
 ## VERIFY
 
@@ -18,7 +19,8 @@
 
 ## WATCH
 
-None.
+13. Headless launch: no "UT99 monitor started" push except after a reboot, a logon or a deliberate restart, and
+    no new `MONITOR_GAP` rows in the CSV.
 
 ## DECIDE
 
@@ -49,4 +51,4 @@ None.
 
 ## Git Actions Outstanding
 
-None.
+14. Delete the merged local branch `fix/headless-console`.

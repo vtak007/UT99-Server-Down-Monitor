@@ -6,6 +6,12 @@ Persistent project memory. Read at the start of every session.
 
 - *(The cause of the server's recent unexplained outages is unknown — gathering the data
   to establish it is the purpose of this project. Nothing confirmed yet.)*
+- **Monitor (not server) — spurious `MONITOR_GAP`s, confirmed 2026-11-23.** The task's `pwsh -WindowStyle Hidden`
+  launch was handed to Windows Terminal (the default terminal), so the monitor sat in a visible, empty window
+  titled `...\pwsh.exe`; closing it killed the monitor (exit `0xC000013A`) and each relaunch sent a
+  "monitor started / previous gap" push. Evidence: the monitor's OpenConsole host started the same second as the
+  task, and a WT window held it. Today's gaps at 16:52, 21:13, 22:10 and 22:15 have that exit code (no Claude
+  session issued a kill); the server was UP throughout. Fixed by launching under `conhost.exe --headless`.
 
 ## RULED-OUT THEORIES
 
@@ -62,6 +68,9 @@ Persistent project memory. Read at the start of every session.
   acknowledgement stops an emergency for everyone; quiet hours are shared.
 
 ## CHANGE LOG
+
+- 2026-11-23 — Task now launches pwsh under `conhost.exe --headless` (no window to close by mistake);
+  `New-MonitorTaskDefinition` gained `-PwshPath`. Live task action updated; monitor restarted 22:25.
 
 - 2026-11-23 — Live outage test passed (UT99 stopped via NFO): GAME_DOWN 16:09:02, emergency sent 16:10:02,
   UP 16:11:32, receipt cancelled + recovery sent 16:12:32 ("was down 2m").

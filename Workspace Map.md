@@ -101,7 +101,7 @@ restart detection (open item).
 
 | Piece | Where | Note |
 |---|---|---|
-| Scheduled task | `UT99 Server Down Monitor` | Created by `New-MonitorTaskDefinition`: at logon plus every 5 min, `IgnoreNew`, runs as the logged-on user (Interactive, never SYSTEM), `pwsh -WindowStyle Hidden -File UT99-Monitor.ps1`. Autologon makes it start unattended after a reboot |
+| Scheduled task | `UT99 Server Down Monitor` | Created by `New-MonitorTaskDefinition`: at logon plus every 5 min, `IgnoreNew`, runs as the logged-on user (Interactive, never SYSTEM), `conhost.exe --headless pwsh -File UT99-Monitor.ps1` (no window; Last Run Result is always 0). Autologon makes it start unattended after a reboot |
 | Target server | `74.91.119.21`, UDP 7778 (query), ICMP | NFOservers VPS; game port 7777 |
 | Link probes | `1.1.1.1`, `8.8.8.8` | `LinkTargets` in config |
 | Pushover API | `https://api.pushover.net/1/` | `messages.json`, `receipts/<id>.json`, `receipts/<id>/cancel.json`; message 1024 / title 250 char limits enforced in `Invoke-PushoverSend` |

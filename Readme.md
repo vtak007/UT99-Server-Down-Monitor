@@ -39,7 +39,8 @@ arriving, the monitor (or the PC) has stopped.
 1. Run `.\Setup.ps1` in PowerShell 7 from the project folder. It asks for the Pushover **User Key** and
    **App Token** (input hidden; press Enter to keep an existing value), writes `config.ini`, sends a test
    notification, and registers the scheduled task **UT99 Server Down Monitor**. The task runs as you at logon,
-   with a hidden window, and every 5 minutes as a watchdog that relaunches a dead monitor.
+   with no window (it starts under a headless console host), and every 5 minutes as a watchdog that relaunches a
+   dead monitor. Task Scheduler's *Last Run Result* is always 0 as a result; check `data\monitor.log` instead.
 2. Answer **Y** to start it now.
 
 **After changing `config.ini` or re-running Setup, restart the monitor.** The running copy keeps its old
@@ -50,6 +51,10 @@ Stop-ScheduledTask 'UT99 Server Down Monitor'; Start-ScheduledTask 'UT99 Server 
 ```
 
 Other settings (interval, thresholds, quiet hours, sounds, retention) are documented in `config.template`.
+
+**An empty `pwsh.exe` window keeps appearing, and closing it triggers a "monitor started" notice?** The task was
+registered by an older Setup that used `-WindowStyle Hidden`. With Windows Terminal as the default terminal, that
+window is the monitor, and closing it kills it. Re-run `.\Setup.ps1` to register the headless launch.
 
 ### Notifying more than one admin
 
